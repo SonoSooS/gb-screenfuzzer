@@ -1,11 +1,13 @@
 INCLUDE "hardware.inc"
 
+DEF IS_RELOCATABLE EQU 1
+
 DEF stack_main EQU $FFFF
 DEF stack_one EQU stack_main - 2
 
 SECTION "HRAM", HRAM[_HRAM]
 
-IF 0
+IF IS_RELOCATABLE
 HRAM_LFSR:
     DS 3
 ENDC
@@ -99,7 +101,7 @@ VRAM_fill_loop_inner:
     JR nz, VRAM_fill_loop_outter
     
     
-IF 0
+IF IS_RELOCATABLE
     ; set up PC-relative hell, LFSR, and others
     LD A, $C9                   ; RET
     LDH [_HRAM], A
