@@ -1,0 +1,9 @@
+.vscode/
+bruteforce/
+gfx/
+build/
+out/
+src/hardware.inc
+Makefile
+*.bat
+*.py
