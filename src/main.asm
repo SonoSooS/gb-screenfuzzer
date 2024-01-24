@@ -14,11 +14,7 @@ LFSR_seed:
     DS 2
 
 data_buffer:
-    DS 20
-    .end:
-data_lines:
-    DS 8
-    .end:
+    DS 2
 
 VRAM_PTR:
     DS 2
@@ -47,16 +43,16 @@ _start::
     JR z, detect_dmg
     
     ; detected CGB instead of DMG
-    LDH [rVBK], A               ; only bit0 matters, guaranteed to be 1
+    LDH [rVBK], A               ; switch to VRAM1, only bit0 matters, guaranteed to be 1
     
-    INC A                       ; should be $80 here
-    LDH [rBGPI], A
+    INC A                       
+    LDH [rBGPI], A              ; should be A == $80 here
     
     XOR A                       ; clear VRAM1 eventually
     
 VRAM_CLR_loop:
     LD [HL+], A
-    BIT 1, H
+    BIT 1, H                    ; if HL > $9FFF
     JR z, VRAM_CLR_loop         ; loop until HL becomes $A000
     
     LDH [rVBK], A               ; reset VBK back to 0 so the rest of the program works
@@ -66,13 +62,13 @@ VRAM_CLR_loop:
     ; clear first palette of BGP (works because VRAM1 is clear)
     ; loop unrolling uses less bytes here due to not having to reload loop counter
     
-    DEC A
+    DEC A                       ; A = $FF
     LDH [C], A
     LDH [C], A
     LDH [C], A
     LDH [C], A
     
-    INC A
+    INC A                       ; A = $00
     LDH [C], A
     LDH [C], A
     LDH [C], A
@@ -80,16 +76,16 @@ VRAM_CLR_loop:
     
     ; fallthrough, doesn't hurt to take DMG path as well
 detect_dmg:
-    LD C, A
+    LD C, A                     ; C = 0
     
     LD A, $F0
     LDH [rBGP], A
     
     ; the fun starts here, set up VRAM
-    LD H, HIGH(_VRAM)           ; L is already 0
+    LD H, HIGH(_VRAM)           ; L is already $00
     
 VRAM_fill_loop_outter:
-    LD B, 8                     ; block row counter
+    LD B, 8                     ; block row counter (8x lines in a tile)
     LD A, C                     ; pattern start = tile index
     
 VRAM_fill_loop_inner:
@@ -141,39 +137,38 @@ ENDC
     XOR A
     LDH [rIF], A
     
-    DEC A
-    LD H, A
+    LD H, $FF                   ; HL = $FFxx
     
     LD DE, 1                    ; LFSR seed
 
 reset_screen:
-    LD B, HIGH(_SCRN0)         ; dst ptr
+    LD B, HIGH(_SCRN0)          ; dst ptr
     
 main_loop:
     LD L, LOW(rIF)
     HALT
     NOP
     
-    BIT 0, [HL]
+    BIT 0, [HL]                 ; is VBlank instead of anything else?
     JR nz, handle_VBL
     
+    ; anything but VBlank (only HBlank currently)
 handle_CC:
     ; timing-sensitive!
     
-    LD [HL], 0
+    LD [HL], 0                  ; reset IF here back to 0 so VBlank can fire without being discarded
     
     LDH A, [data_buffer+0]
     LDH [rSCY], A
     
-    LDH A, [VRAM_PTR]
-    LD C, A
+    LD L, LOW(VRAM_PTR)
+    LD C, [HL]
     LDH A, [data_buffer+1]
     LD [BC], A
     
     INC BC
-    LD A, C
-    LDH [VRAM_PTR], A
-    BIT 2, B
+    LD [HL], C
+    BIT 2, B                    ; BC > $9BFF
     JR nz, reset_screen
     
     LD L, LOW(data_buffer)
