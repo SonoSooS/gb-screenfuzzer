@@ -27,6 +27,7 @@ SECTION "Main", ROM0[$150]
     
 _start::
     ; A == 0 at this point
+    ; C == 0 too (equivalent to $FF00 JOYP)
     
     LD SP, stack_main           ; just in case it's not in HRAM already (needed for T2)
     
