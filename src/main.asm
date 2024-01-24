@@ -183,8 +183,7 @@ handle_CC:
     JR main_loop
 
 handle_VBL:
-    XOR A
-    LD [HL], A
+    LD [HL], 0
     
     JR main_loop
 
