@@ -23,8 +23,14 @@ data_buffer:
 VRAM_PTR:
     DS 2
 
-SECTION "Main", ROM0[$150]
-    
+SECTION "Entrypoint", ROM0
+    ; we have two extra bytes in ROM image to clear A and C to 0
+    XOR A
+    LD C, A
+    JR _start
+
+SECTION "Main", ROM0
+
 _start::
     ; A == 0 at this point
     ; C == 0 too (equivalent to $FF00 JOYP)
@@ -137,6 +143,8 @@ ELSE
 DEF HRAM_LFSR EQUS "ROM_LFSR"
 ENDC
     
+MAIN_BUFFER:
+    
     ; everything else is set up, ready to set up the state before the main loop
     LD A, STATF_MODE00
     LDH [rSTAT], A
@@ -236,4 +244,7 @@ ROM_LFSR:: ; DE = seed, HL = dst, C = count
     
     ; total ROM:    20b
 .end:
-    
+
+MAIN_BUFFER_END:
+
+ASSERT MAIN_BUFFER_END - MAIN_BUFFER <= ($7F - 2 - SIZEOF("HRAM Data")), "HRAM code section overflow"
