@@ -14,9 +14,6 @@ HRAM_LFSR:
     DS 3
 ENDC
 
-LFSR_seed:
-    DS 2
-
 data_buffer:
     DS 3
 
