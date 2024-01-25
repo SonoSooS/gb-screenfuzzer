@@ -1,7 +1,7 @@
 INCLUDE "hardware.inc"
 
 DEF SUPPORT_DMG EQU 1
-DEF SUPPORT_CGB EQU 0
+DEF SUPPORT_CGB EQU 1
 DEF IS_RAMIMAGE EQU 0
 
 DEF stack_main EQU $FFFF
@@ -27,9 +27,12 @@ SECTION "Entrypoint", ROM0
     ; we have two extra bytes in ROM image to clear A and C to 0
     XOR A
     LD C, A
+
+IF !IS_RAMIMAGE
     JR _start
 
 SECTION "Main", ROM0
+ENDC
 
 _start::
     ; A == 0 at this point
