@@ -1,13 +1,15 @@
 INCLUDE "hardware.inc"
 
-DEF IS_RELOCATABLE EQU 1
+DEF SUPPORT_DMG EQU 1
+DEF SUPPORT_CGB EQU 0
+DEF IS_RAMIMAGE EQU 0
 
 DEF stack_main EQU $FFFF
 DEF stack_one EQU stack_main - 2
 
-SECTION "HRAM", HRAM[_HRAM]
+SECTION "HRAM Data", HRAM[_HRAM]
 
-IF IS_RELOCATABLE
+IF IS_RAMIMAGE
 HRAM_LFSR:
     DS 3
 ENDC
@@ -16,7 +18,7 @@ LFSR_seed:
     DS 2
 
 data_buffer:
-    DS 2
+    DS 3
 
 VRAM_PTR:
     DS 2
@@ -39,10 +41,14 @@ _start::
     LD HL, _VRAM
     
     ; detect CGB or DMG
-    
+IF SUPPORT_CGB
+IF SUPPORT_DMG
     LDH A, [rKEY1]
     INC A                       ; $FF on DMG, test if equals to that
     JR z, detect_dmg
+ELSE
+    RRA                         ; turn $FF into $7F
+ENDC
     
     ; detected CGB instead of DMG
     LDH [rVBK], A               ; switch to VRAM1, only bit0 matters, guaranteed to be 1
@@ -80,11 +86,15 @@ VRAM_CLR_loop:
 detect_dmg:
     LD C, A                     ; C = 0
     
-    LD A, $F0
-    LDH [rBGP], A
-    
     ; the fun starts here, set up VRAM
     LD H, HIGH(_VRAM)           ; L is already $00
+    
+ENDC
+    
+IF SUPPORT_DMG
+    LD A, $F0
+    LDH [rBGP], A
+ENDC
     
 VRAM_fill_loop_outter:
     LD B, 8                     ; block row counter (8x lines in a tile)
@@ -101,7 +111,7 @@ VRAM_fill_loop_inner:
     JR nz, VRAM_fill_loop_outter
     
     
-IF IS_RELOCATABLE
+IF IS_RAMIMAGE
     ; set up PC-relative hell, LFSR, and others
     LD A, $C9                   ; RET
     LDH [_HRAM], A
@@ -141,15 +151,14 @@ ENDC
     
     LD H, $FF                   ; HL = $FFxx
     
-    LD DE, 1                    ; LFSR seed
-
+    LD E, H                     ; set DE to anything but zero
+    
 reset_screen:
     LD B, HIGH(_SCRN0)          ; dst ptr
     
 main_loop:
     LD L, LOW(rIF)
-    HALT
-    NOP
+    DB $76, $00                 ; HALT with NOP due to weird HALT bug
     
     BIT 0, [HL]                 ; is VBlank instead of anything else?
     JR nz, handle_VBL
@@ -158,7 +167,7 @@ main_loop:
 handle_CC:
     ; timing-sensitive!
     
-    LD [HL], 0                  ; reset IF here back to 0 so VBlank can fire without being discarded
+    LD [HL], C                  ; reset IF here back to (C ==) 0 so VBlank can fire without being discarded
     
     LDH A, [data_buffer+0]
     LDH [rSCY], A
@@ -167,6 +176,7 @@ handle_CC:
     LD C, [HL]
     LDH A, [data_buffer+1]
     LD [BC], A
+    LDH [rSCX], A
     
     INC BC
     LD [HL], C
@@ -174,17 +184,16 @@ handle_CC:
     JR nz, reset_screen
     
     LD L, LOW(data_buffer)
-    LD C, 2
-    CALL HRAM_LFSR
+    LD C, 3
+    CALL HRAM_LFSR              ; C will be 0 after this call
     
     JR main_loop
-
+    
 handle_VBL:
-    LD [HL], 0
+    LD [HL], C                  ; C is always 0 here
     
     JR main_loop
-
-
+    
 ROM_LFSR:: ; DE = seed, HL = dst, C = count
     LD A, D                     ; 1c
 .loop:
